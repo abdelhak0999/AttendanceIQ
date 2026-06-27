@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AttendanceIQ | Rapports de Ponctualité</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+<script>if(!localStorage.getItem("token")){window.location.href="login.html";}</script>
+</head>
+<body>
+    <div class="layout-wrapper">
+        <aside class="sidebar">
+            <div class="logo-container">
+                <i class="ri-fingerprint-line logo-icon"></i>
+                <h2>AttendanceIQ</h2>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="index.html" class="nav-item"><i class="ri-dashboard-line"></i> <span>Tableau de bord</span></a>
+                <a href="employees.html" class="nav-item"><i class="ri-team-line"></i> <span>Employés</span></a>
+                <a href="absences.html" class="nav-item"><i class="ri-calendar-check-line"></i> <span>Absences</span></a>
+                <a href="reports.html" class="nav-item active"><i class="ri-file-chart-line"></i> <span>Rapports</span></a>
+                <div class="nav-section-title" style="padding: 20px 24px 10px; color: #64748b; font-size: 12px; text-transform: uppercase; font-weight: bold;">Administration</div>
+                <a href="holidays.html" class="nav-item"><i class="ri-calendar-event-line"></i> <span>Jours Fériés</span></a>
+                <a href="leaves.html" class="nav-item"><i class="ri-calendar-todo-line"></i> <span>Congés</span></a>
+                <a href="settings.html" class="nav-item"><i class="ri-settings-3-line"></i> <span>Configuration</span></a>
+            </nav>
+            <div style="padding:24px;margin-top:auto;"><button onclick="logout()" class="btn-secondary" style="width:100%;"><i class="ri-logout-box-line"></i> Déconnexion</button></div>
+        </aside>
+
+        <main class="main-content">
+            <header class="top-header">
+                <div class="header-title">
+                    <h1>Rapport des Retards & Déductions</h1>
+                    <p>Analyse précise des retards basés sur les shifts et la période de grâce</p>
+                </div>
+                <div class="header-actions">
+                    <div style="display:flex; gap:12px; align-items:center;">
+                        <label>Du:</label>
+                        <input type="date" id="start-date">
+                        <label>Au:</label>
+                        <input type="date" id="end-date">
+                        <button class="btn-primary" onclick="loadDeductions()">
+                            <i class="ri-search-line"></i> Calculer
+                        </button>
+                        <button class="btn-secondary" onclick="exportExcel()" style="background:#16a34a; color:white; border:none;">
+                            <i class="ri-file-excel-2-line"></i> Export Excel
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <section class="data-section">
+                <div class="section-header">
+                    <h2>Détails des Retards</h2>
+                    <div id="total-deduction-info" style="font-weight: bold; font-size: 16px; color: var(--primary-color);"></div>
+                </div>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Employé</th>
+                                <th>Matricule</th>
+                                <th>Date</th>
+                                <th>Minutes de retard</th>
+                                <th>Déduction (Heures)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="deductions-tbody">
+                            <tr><td colspan="5" style="text-align:center;">Veuillez sélectionner une période et cliquer sur calculer</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        const API = "http://127.0.0.1:8000";
+
+        async function loadDeductions() {
+            const start = document.getElementById("start-date").value;
+            const end = document.getElementById("end-date").value;
+            if(!start || !end) return alert("Sélectionnez les dates");
+
+            const tbody = document.getElementById("deductions-tbody");
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Calcul en cours...</td></tr>';
+
+            try {
+                const res = await fetch(`${API}/reports/deductions?start_date=${start}&end_date=${end}`);
+                const data = await res.json();
+
+                if (data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Aucun retard détecté pour cette période</td></tr>';
+                    document.getElementById("total-deduction-info").textContent = "";
+                    return;
+                }
+
+                let totalHours = 0;
+                tbody.innerHTML = data.map(d => {
+                    totalHours += d.deduction_hours;
+                    return `
+                        <tr>
+                            <td><strong>${d.employee_name}</strong></td>
+                            <td>${d.matricule}</td>
+                            <td>${d.date}</td>
+                            <td style="color:var(--danger); font-weight:bold;">${d.late_mins} min</td>
+                            <td>${d.deduction_hours} h</td>
+                        </tr>
+                    `;
+                }).join("");
+
+                document.getElementById("total-deduction-info").textContent = `Total Déductions : ${totalHours.toFixed(2)} heures`;
+            } catch (e) {
+                alert("Erreur lors du calcul");
+            }
+        }
+
+        async function exportExcel() {
+            const start = document.getElementById("start-date").value;
+            const end = document.getElementById("end-date").value;
+            if(!start || !end) return alert("Sélectionnez les dates");
+
+            window.location.href = `${API}/reports/export?start_date=${start}&end_date=${end}`;
+        }
+
+        function logout(){ localStorage.clear(); window.location.href="login.html"; }
+    </script>
+</body>
+</html>

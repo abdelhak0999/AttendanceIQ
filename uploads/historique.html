@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AttendanceIQ | Historique</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+<script>if(!localStorage.getItem("token")){window.location.href="login.html";}</script>
+</head>
+<body>
+    <div class="layout-wrapper">
+        <aside class="sidebar">
+            <div class="logo-container">
+                <i class="ri-fingerprint-line logo-icon"></i>
+                <h2>AttendanceIQ</h2>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="index.html" class="nav-item"><i class="ri-dashboard-line"></i> <span>Tableau de bord</span></a>
+                <a href="employees.html" class="nav-item active"><i class="ri-team-line"></i> <span>Employés</span></a>
+                <a href="absences.html" class="nav-item"><i class="ri-calendar-check-line"></i> <span>Absences</span></a>
+                <a href="reports.html" class="nav-item"><i class="ri-file-chart-line"></i> <span>Rapports</span></a>
+                <a href="settings.html" class="nav-item"><i class="ri-settings-3-line"></i> <span>Configuration</span></a>
+            </nav>
+<div style="padding:24px;margin-top:auto;"><button onclick="logout()" class="btn-secondary" style="width:100%;"><i class="ri-logout-box-line"></i> Déconnexion</button></div>
+        </aside>
+
+        <main class="main-content">
+            <header class="top-header">
+                <div class="header-title">
+                    <h1 id="emp-name">Historique</h1>
+                    <p id="emp-info">Chargement...</p>
+                </div>
+                <div class="header-actions">
+                    <input type="month" id="month-picker" onchange="loadHistory()">
+                    <a href="employees.html" class="btn-secondary" style="text-decoration:none;">
+                        <i class="ri-arrow-left-line"></i> Retour
+                    </a>
+                </div>
+            </header>
+
+            <!-- Résumé mensuel -->
+            <section class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon present"><i class="ri-user-received-2-line"></i></div>
+                    <div class="stat-details">
+                        <h3>Jours présent</h3>
+                        <p class="stat-number" id="days-present">...</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon absent"><i class="ri-user-unfollow-line"></i></div>
+                    <div class="stat-details">
+                        <h3>Jours absent</h3>
+                        <p class="stat-number" id="days-absent">...</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon late"><i class="ri-timer-line"></i></div>
+                    <div class="stat-details">
+                        <h3>Retards</h3>
+                        <p class="stat-number" id="late-count">...</p>
+                    </div>
+                </div>
+                <div class="stat-card anomaly-card">
+                    <div class="stat-icon anomaly"><i class="ri-alert-line"></i></div>
+                    <div class="stat-details">
+                        <h3>Minutes retard</h3>
+                        <p class="stat-number" id="late-mins">...</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Tableau des pointages -->
+            <section class="data-section">
+                <div class="section-header">
+                    <h2>Détail des pointages</h2>
+                </div>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Entrée matin</th>
+                                <th>Sortie pause</th>
+                                <th>Entrée après-midi</th>
+                                <th>Sortie soir</th>
+                                <th>Statut journée</th>
+                                <th>Minutes retard</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-tbody">
+                            <tr><td colspan="7" style="text-align:center;">Chargement...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        const API = "http://127.0.0.1:8000";
+
+        const STATUTS = {
+            "a_l_heure":        '<span class="badge badge-success">À l\'heure</span>',
+            "retard":           '<span class="badge badge-warning">Retard</span>',
+            "pause_depassee":   '<span class="badge badge-warning">Pause dépassée</span>',
+            "sortie_anticipee": '<span class="badge badge-danger">Sortie anticipée</span>',
+            "anomalie":         '<span class="badge badge-danger">Anomalie</span>',
+            "absent":           '<span class="badge badge-danger">Absent</span>',
+            "pending":          '<span class="badge" style="background:#f1f5f9;color:#64748b;">—</span>',
+        };
+
+        // Get employee ID from URL
+        const params = new URLSearchParams(window.location.search);
+        const empId = params.get("id");
+
+        async function loadEmployee() {
+            if (!empId) return;
+            const res = await fetch(`${API}/employees/${empId}`);
+            const emp = await res.json();
+            document.getElementById("emp-name").textContent = emp.name;
+            document.getElementById("emp-info").textContent = `Matricule: ${emp.matricule || '-'} — ${emp.department || '-'}`;
+        }
+
+        async function loadHistory() {
+            if (!empId) return;
+            const month = document.getElementById("month-picker").value;
+            let url = `${API}/employees/${empId}/history`;
+            if (month) url += `?month=${month}`;
+
+            const res = await fetch(url);
+            const data = await res.json();
+
+            // Update summary stats
+            document.getElementById("days-present").textContent = data.summary.days_present;
+            document.getElementById("days-absent").textContent = data.summary.days_absent;
+            document.getElementById("late-count").textContent = data.summary.late_count;
+            document.getElementById("late-mins").textContent = data.summary.total_late_mins + " min";
+
+            const tbody = document.getElementById("history-tbody");
+            if (data.days.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">Aucun pointage ce mois</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = data.days.map(day => `
+                <tr>
+                    <td><strong>${day.date}</strong></td>
+                    <td>${day.entree_matin || '<span style="color:var(--text-muted)">—</span>'}</td>
+                    <td>${day.sortie_pause || '<span style="color:var(--text-muted)">—</span>'}</td>
+                    <td>${day.entree_apres_midi || '<span style="color:var(--text-muted)">—</span>'}</td>
+                    <td>${day.sortie_soir || '<span style="color:var(--text-muted)">—</span>'}</td>
+                    <td>${STATUTS[day.statut] || STATUTS["pending"]}</td>
+                    <td>${day.minutes_retard > 0 ? `<span style="color:var(--warning);font-weight:bold;">${day.minutes_retard} min</span>` : '—'}</td>
+                </tr>
+            `).join("");
+        }
+
+        // Default month = current
+        const now = new Date();
+        document.getElementById("month-picker").value =
+            `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+
+        loadEmployee();
+        loadHistory();
+    </script>
+<script>function logout(){localStorage.removeItem("token");window.location.href="login.html";}</script>
+</body>
+</html>

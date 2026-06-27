@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AttendanceIQ | Absences</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+<script>if(!localStorage.getItem("token")){window.location.href="login.html";}</script>
+</head>
+<body>
+    <div class="layout-wrapper">
+        <aside class="sidebar">
+            <div class="logo-container">
+                <i class="ri-fingerprint-line logo-icon"></i>
+                <h2>AttendanceIQ</h2>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="index.html" class="nav-item"><i class="ri-dashboard-line"></i> <span>Tableau de bord</span></a>
+                <a href="employees.html" class="nav-item"><i class="ri-team-line"></i> <span>Employés</span></a>
+                <a href="absences.html" class="nav-item active"><i class="ri-calendar-check-line"></i> <span>Absences</span></a>
+                <a href="reports.html" class="nav-item"><i class="ri-file-chart-line"></i> <span>Rapports</span></a>
+                <div class="nav-section-title" style="padding: 20px 24px 10px; color: #64748b; font-size: 12px; text-transform: uppercase; font-weight: bold;">Administration</div>
+                <a href="holidays.html" class="nav-item"><i class="ri-calendar-event-line"></i> <span>Jours Fériés</span></a>
+                <a href="leaves.html" class="nav-item"><i class="ri-calendar-todo-line"></i> <span>Congés</span></a>
+                <a href="settings.html" class="nav-item"><i class="ri-settings-3-line"></i> <span>Configuration</span></a>
+            </nav>
+<div style="padding:24px;margin-top:auto;"><button onclick="logout()" class="btn-secondary" style="width:100%;"><i class="ri-logout-box-line"></i> Déconnexion</button></div>
+        </aside>
+
+        <main class="main-content">
+            <header class="top-header">
+                <div class="header-title">
+                    <h1>Gestion des absences</h1>
+                    <p>Consulter et justifier les absences détectées</p>
+                </div>
+                <div class="header-actions">
+                    <div style="display:flex; gap:12px; align-items:center;">
+                        <button class="btn-primary" onclick="syncAbsences()" style="padding:8px 16px; cursor:pointer; display:flex; align-items:center; gap:8px;">
+                            <i class="ri-refresh-line"></i> Analyser les absences
+                        </button>
+                        <div style="display:flex; gap:8px; align-items:center;">
+                            <label style="display:inline; margin:0;">Du:</label>
+                            <input type="date" id="start-date" onchange="loadAbsences()">
+                            <label style="display:inline; margin:0;">Au:</label>
+                            <input type="date" id="end-date" onchange="loadAbsences()">
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <section class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon absent"><i class="ri-user-unfollow-line"></i></div>
+                    <div class="stat-details">
+                        <h3>Total absences</h3>
+                        <p class="stat-number" id="total-absences">...</p>
+                    </div>
+                </div>
+                <div class="stat-card anomaly-card">
+                    <div class="stat-icon anomaly"><i class="ri-close-circle-line"></i></div>
+                    <div class="stat-details">
+                        <h3>Non justifiées</h3>
+                        <p class="stat-number" id="unjustified-count">...</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon present"><i class="ri-checkbox-circle-line"></i></div>
+                    <div class="stat-details">
+                        <h3>Justifiées</h3>
+                        <p class="stat-number" id="justified-count">...</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="data-section">
+                <div class="section-header">
+                    <h2>Liste des absences</h2>
+                </div>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Employé</th>
+                                <th>Matricule</th>
+                                <th>Département</th>
+                                <th>Date</th>
+                                <th>Justification</th>
+                                <th>Notes</th>
+                                <th>Enregistrer</th>
+                            </tr>
+                        </thead>
+                        <tbody id="absences-tbody">
+                            <tr><td colspan="7" style="text-align:center;">Chargement...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        const API = "http://127.0.0.1:8000";
+
+        const JUSTIFICATIONS = [
+            { value: "",             label: "— Non justifiée —" },
+            { value: "maladie",      label: "Maladie" },
+            { value: "mission",      label: "Mission" },
+            { value: "allaitement",  label: "Allaitement" },
+            { value: "conge_annuel", label: "Congé annuel" },
+            { value: "recuperation", label: "Récupération" },
+            { value: "maternite",    label: "Maternité" },
+            { value: "autre",        label: "Autre (voir notes)" },
+        ];
+
+        function justificationOptions(selected) {
+            return JUSTIFICATIONS.map(j =>
+                `<option value="${j.value}" ${selected === j.value ? "selected" : ""}>${j.label}</option>`
+            ).join("");
+        }
+
+        function updateRowColor(select) {
+            const row = select.closest("tr");
+            if (select.value === "") {
+                row.style.borderLeft = "4px solid var(--danger)";
+                row.style.backgroundColor = "#fff5f5";
+            } else {
+                row.style.borderLeft = "4px solid var(--success)";
+                row.style.backgroundColor = "#f0fdf4";
+            }
+        }
+
+        async function saveAbsence(id, selectEl, notesEl) {
+            const res = await fetch(`${API}/absences/${id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    justification: selectEl.value || null,
+                    notes: notesEl.value
+                })
+            });
+            if (res.ok) {
+                updateRowColor(selectEl);
+                alert("✅ Enregistré avec succès");
+            } else {
+                alert("❌ Erreur lors de l'enregistrement");
+            }
+        }
+
+        async function syncAbsences() {
+            const btn = event.currentTarget;
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="ri-loader-4-line"></i> Analyse en cours...';
+            
+            try {
+                const res = await fetch(`${API}/sync/absences`, { method: "POST" });
+                if (res.ok) {
+                    alert("✅ Analyse terminée ! Les absences ont été mises à jour.");
+                    loadAbsences();
+                } else {
+                    alert("❌ Erreur lors de l'analyse");
+                }
+            } catch (e) {
+                alert("❌ Erreur de connexion au serveur");
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        }
+
+        async function loadAbsences() {
+            const startDate = document.getElementById("start-date").value;
+            const endDate = document.getElementById("end-date").value;
+            
+            let url = `${API}/absences/`;
+            if (startDate && endDate) {
+                url += `?start_date=${startDate}&end_date=${endDate}`;
+            }
+
+            const res = await fetch(url);
+            const absences = await res.json();
+
+            const total = absences.length;
+            const justified = absences.filter(a => a.justification).length;
+            const unjustified = total - justified;
+
+            document.getElementById("total-absences").textContent = total;
+            document.getElementById("justified-count").textContent = justified;
+            document.getElementById("unjustified-count").textContent = unjustified;
+
+            const tbody = document.getElementById("absences-tbody");
+            if (absences.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">Aucune absence pour cette période</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = absences.map(a => `
+                <tr id="row-${a.id}">
+                    <td><strong>${a.employee_name}</strong></td>
+                    <td>${a.matricule || '-'}</td>
+                    <td>${a.department || '-'}</td>
+                    <td>${a.absence_date}</td>
+                    <td>
+                        <select id="just-${a.id}" style="width:160px;" onchange="updateRowColor(this)">
+                            ${justificationOptions(a.justification || "")}
+                        </select>
+                    </td>
+                    <td><input type="text" id="notes-${a.id}" value="${a.notes || ''}" placeholder="Notes optionnelles..." style="width:160px;"></td>
+                    <td>
+                        <button class="btn-primary" style="padding:8px 12px;"
+                            onclick="saveAbsence(${a.id}, document.getElementById('just-${a.id}'), document.getElementById('notes-${a.id}'))">
+                            <i class="ri-save-line"></i>
+                        </button>
+                    </td>
+                </tr>
+            `).join("");
+
+            absences.forEach(a => {
+                const sel = document.getElementById(`just-${a.id}`);
+                if (sel) updateRowColor(sel);
+            });
+        }
+
+        const now = new Date();
+        const nextMonth = new Date();
+        nextMonth.setMonth(now.getMonth() + 1);
+        
+        document.getElementById("start-date").value = now.toISOString().split('T')[0];
+        document.getElementById("end-date").value = nextMonth.toISOString().split('T')[0];
+
+        loadAbsences();
+    </script>
+<script>function logout(){localStorage.removeItem("token");window.location.href="login.html";}</script>
+</body>
+</html>
