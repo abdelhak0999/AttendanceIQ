@@ -12,12 +12,10 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="AttendanceIQ", description="Professional Time and Attendance Management System")
 
-# ========== MONTER LE DOSSIER STATIQUE ==========
-# Ici, nous servons les fichiers HTML/CSS/JS depuis le dossier "uploads"
-# sous l'URL "/static". Si vous renommez le dossier en "static", changez le directory.
+# MONTER LE DOSSIER STATIQUE
 app.mount("/static", StaticFiles(directory="uploads"), name="static")
 
-# ========== CORS ==========
+#CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -26,14 +24,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ========== ROUTERS ==========
+#ROUTERS
 app.include_router(auth.router)
 app.include_router(employees.router)
 app.include_router(attendance.router)
 app.include_router(settings.router)
 app.include_router(sync.router)
 
-# ========== ÉVÉNEMENT DE DÉMARRAGE ==========
+#startup
 @app.on_event("startup")
 async def startup_event():
     def start_task():
@@ -58,7 +56,7 @@ async def startup_event():
             # Seed de la hiérarchie CETIM
             root_dept = db.query(Department).filter(Department.name == "CETIM").first()
             if not root_dept:
-                print("🌱 Seeding CETIM Hierarchy...")
+                print("Seeding CETIM Hierarchy...")
                 cetim = Department(name="CETIM")
                 db.add(cetim)
                 db.commit()
@@ -82,14 +80,13 @@ async def startup_event():
                     for child_name in children:
                         db.add(Department(name=child_name, parent_id=parent.id))
                 db.commit()
-                print("✅ CETIM Hierarchy seeded.")
+                print("CETIM Hierarchy seeded.")
 
-            # ========== SYNCHRONISATION MDB DÉSACTIVÉE AU DÉMARRAGE ==========
-            # Pour éviter les verrous de base de données, on ne lance plus
+            # SYNCHRONISATION MDB DÉSACTIVÉE AU DÉMARRAGE
             # automatiquement l'import de l'intégralité de la MDB.
             # Utilisez le bouton "Sync MDB" dans l'interface ou l'API /sync/mdb.
             # sync_from_mdb_internal(db)
-            print("ℹ️ Synchronisation MDB désactivée au démarrage. Utilisez le bouton Sync MDB.")
+            print("Synchronisation MDB désactivée au démarrage. Utilisez le bouton Sync MDB.")
 
         except Exception as e:
             print(f"Startup error: {e}")
@@ -100,7 +97,7 @@ async def startup_event():
 
     threading.Thread(target=start_task, daemon=True).start()
 
-# ========== ROUTE RACINE ==========
+# ROUTE RACINE
 @app.get("/")
 def root():
     return {"message": "Welcome to AttendanceIQ API. Visit /docs for documentation."}
