@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AttendanceIQ | Configuration</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+<script>if(!localStorage.getItem("token")){window.location.href="login.html";}</script>
+</head>
+<body>
+    <div class="layout-wrapper">
+        <aside class="sidebar">
+            <div class="logo-container">
+                <i class="ri-fingerprint-line logo-icon"></i>
+                <h2>AttendanceIQ</h2>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="index.html" class="nav-item"><i class="ri-dashboard-line"></i> <span>Tableau de bord</span></a>
+                <a href="employees.html" class="nav-item"><i class="ri-team-line"></i> <span>Employés</span></a>
+                <a href="absences.html" class="nav-item"><i class="ri-calendar-check-line"></i> <span>Absences</span></a>
+                <a href="reports.html" class="nav-item"><i class="ri-file-chart-line"></i> <span>Rapports</span></a>
+                <div class="nav-section-title" style="padding: 20px 24px 10px; color: #64748b; font-size: 12px; text-transform: uppercase; font-weight: bold;">Administration</div>
+                <a href="holidays.html" class="nav-item"><i class="ri-calendar-event-line"></i> <span>Jours Fériés</span></a>
+                <a href="leaves.html" class="nav-item"><i class="ri-calendar-todo-line"></i> <span>Congés</span></a>
+                <a href="shifts.html" class="nav-item"><i class="ri-time-line"></i> <span>Horaires (Shifts)</span></a>
+                <a href="settings.html" class="nav-item active"><i class="ri-settings-3-line"></i> <span>Configuration</span></a>
+            </nav>
+            <div style="padding:24px;margin-top:auto;"><button onclick="logout()" class="btn-secondary" style="width:100%;"><i class="ri-logout-box-line"></i> Déconnexion</button></div>
+        </aside>
+
+        <main class="main-content">
+            <header class="top-header">
+                <div class="header-title">
+                    <h1>Configuration Système</h1>
+                    <p>Paramètres généraux et connexion à la machine ZKTeco</p>
+                </div>
+            </header>
+
+            <div class="grid-2">
+                <section class="data-section">
+                    <div class="section-header">
+                        <h2>⚙️ Paramètres Généraux</h2>
+                    </div>
+                    <form id="settings-form">
+                        <div class="form-group">
+                            <label>Marge de tolérance (minutes)</label>
+                            <input type="number" id="grace_period" min="0">
+                        </div>
+                        <div class="form-group">
+                            <label><i class="ri-broadcast-line"></i> Adresse IP de la Machine ZKTeco</label>
+                            <input type="text" id="device_ip" placeholder="ex: 172.20.113.253" value="172.20.113.253">
+                        </div>
+                        <div class="form-group">
+                            <label><i class="ri-plug-line"></i> Port de la machine (défaut: 4370)</label>
+                            <input type="number" id="device_port" placeholder="4370" value="4370">
+                        </div>
+                        <div class="form-group">
+                            <label><i class="ri-key-2-line"></i> Mot de passe (0 si aucun)</label>
+                            <input type="number" id="device_password" placeholder="0" value="0">
+                        </div>
+                        <button type="submit" class="btn-primary" style="width:100%;">Enregistrer les paramètres</button>
+                    </form>
+                    <div style="margin-top: 20px;">
+                        <button class="btn-secondary" onclick="testConnection()" style="width:100%; border-color: var(--primary-color); color: var(--primary-color);">
+                            <i class="ri-wifi-line"></i> Tester la connexion à la machine
+                        </button>
+                        <div id="connection-result" style="margin-top: 12px; padding: 8px; border-radius: 6px; font-size: 14px; display: none;"></div>
+                    </div>
+                    <div style="margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 20px;">
+                        <button class="btn-secondary" onclick="syncMDB()" style="width:100%; border-color: #16a34a; color: #16a34a;">
+                            <i class="ri-database-2-line"></i> Sync MDB (importer les données)
+                        </button>
+                        <div id="mdb-result" style="margin-top: 12px; padding: 8px; border-radius: 6px; font-size: 14px; display: none;"></div>
+                    </div>
+                </section>
+
+                <section class="data-section">
+                    <div class="section-header">
+                        <h2>🔐 Sécurité & Accès</h2>
+                    </div>
+                    <div id="admin-setup" style="display:none;">
+                        <p style="margin-bottom:20px; color:var(--text-muted);">✅ Le compte administrateur est déjà configuré.</p>
+                    </div>
+                    <div id="admin-form">
+                        <p style="margin-bottom:20px; color:var(--danger);">⚠️ Aucun administrateur configuré ! Créez-en un maintenant.</p>
+                        <div class="form-group">
+                            <label>Nom d'utilisateur Admin</label>
+                            <input type="text" id="admin-user">
+                        </div>
+                        <div class="form-group">
+                            <label>Mot de passe Admin</label>
+                            <input type="password" id="admin-pass">
+                        </div>
+                        <button class="btn-primary" onclick="setupAdmin()" style="width:100%;">Créer le compte Admin</button>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const API = window.location.origin;
+
+        // --- Chargement des paramètres ---
+        async function loadSettings() {
+            try {
+                const res = await fetch(`${API}/settings/`);
+                const s = await res.json();
+                document.getElementById("grace_period").value = s.grace_period || 15;
+                document.getElementById("device_ip").value = s.device_ip || "";
+                document.getElementById("device_port").value = s.device_port || 4370;
+                document.getElementById("device_password").value = s.device_password || 0;
+            } catch (e) {
+                console.error("Erreur chargement settings:", e);
+            }
+        }
+
+        // --- Enregistrement ---
+        document.getElementById('settings-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const data = {
+                grace_period: parseInt(document.getElementById("grace_period").value),
+                device_ip: document.getElementById("device_ip").value,
+                device_port: parseInt(document.getElementById("device_port").value) || 4370,
+                device_password: parseInt(document.getElementById("device_password").value) || 0,
+                sync_interval: 30,
+            };
+            try {
+                const res = await fetch(`${API}/settings/`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(data)
+                });
+                if (res.ok) {
+                    alert("✅ Paramètres mis à jour");
+                } else {
+                    alert("❌ Erreur lors de l'enregistrement");
+                }
+            } catch (err) {
+                alert("❌ Erreur de connexion au serveur.");
+            }
+        };
+
+        // --- Test connexion ZKTeco ---
+        async function testConnection() {
+            const resultDiv = document.getElementById('connection-result');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = '<i class="ri-loader-4-line spin"></i> Test en cours...';
+            resultDiv.style.background = '#f1f5f9';
+            resultDiv.style.color = '#1e293b';
+
+            try {
+                const res = await fetch(`${API}/settings/test-connection`, { method: 'POST' });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    resultDiv.style.background = '#d1fae5';
+                    resultDiv.style.color = '#065f46';
+                    resultDiv.innerHTML = `<i class="ri-checkbox-circle-line"></i> ${data.message}`;
+                } else {
+                    resultDiv.style.background = '#fee2e2';
+                    resultDiv.style.color = '#991b1b';
+                    resultDiv.innerHTML = `<i class="ri-error-warning-line"></i> ${data.message}`;
+                }
+            } catch (err) {
+                resultDiv.style.background = '#fef3c7';
+                resultDiv.style.color = '#92400e';
+                resultDiv.innerHTML = `
+                    <i class="ri-information-line"></i> 
+                    Le test de connexion n'est pas disponible. 
+                    <br>Vous pouvez synchroniser directement depuis la page Absences avec le bouton "Sync Machine".
+                `;
+            }
+        }
+
+        // --- Sync MDB ---
+        async function syncMDB() {
+            const resultDiv = document.getElementById('mdb-result');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = '<i class="ri-loader-4-line spin"></i> Importation en cours... (peut prendre plusieurs minutes)';
+            resultDiv.style.background = '#f1f5f9';
+            resultDiv.style.color = '#1e293b';
+
+            try {
+                const res = await fetch(`${API}/sync/mdb`, { method: 'POST' });
+                const data = await res.json();
+                if (res.ok) {
+                    resultDiv.style.background = '#d1fae5';
+                    resultDiv.style.color = '#065f46';
+                    resultDiv.innerHTML = `<i class="ri-checkbox-circle-line"></i> Synchronisation MDB terminée ! Les employés et pointages ont été importés. Rechargez la page Employés.`;
+                } else {
+                    resultDiv.style.background = '#fee2e2';
+                    resultDiv.style.color = '#991b1b';
+                    resultDiv.innerHTML = `<i class="ri-error-warning-line"></i> Erreur : ${data.detail || 'inconnue'}`;
+                }
+            } catch (err) {
+                resultDiv.style.background = '#fee2e2';
+                resultDiv.style.color = '#991b1b';
+                resultDiv.innerHTML = `<i class="ri-error-warning-line"></i> Erreur de connexion au serveur.`;
+            }
+        }
+
+        // --- Création Admin ---
+        async function setupAdmin() {
+            const username = document.getElementById("admin-user").value;
+            const password = document.getElementById("admin-pass").value;
+            if(!username || !password) return alert("Remplissez tout");
+            
+            try {
+                const res = await fetch(`${API}/auth/setup`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ username, password })
+                });
+                if(res.ok) {
+                    alert("✅ Admin créé ! Veuillez vous reconnecter.");
+                    window.location.href = "login.html";
+                } else {
+                    const err = await res.json();
+                    alert(`❌ ${err.detail || "Erreur"}`);
+                }
+            } catch (e) {
+                alert("❌ Erreur de connexion au serveur");
+            }
+        }
+
+        // --- Vérifier si admin existe déjà ---
+        async function checkAdminExists() {
+            try {
+                const res = await fetch(`${API}/auth/admin-exists`);
+                const data = await res.json();
+                if (data.exists) {
+                    document.getElementById('admin-form').style.display = 'none';
+                    document.getElementById('admin-setup').style.display = 'block';
+                }
+            } catch (e) {
+                // Si la route n'existe pas, on ne fait rien
+            }
+        }
+
+        // --- Déconnexion ---
+        function logout(){ localStorage.clear(); window.location.href="login.html"; }
+
+        // --- INIT ---
+        loadSettings();
+        checkAdminExists();
+    </script>
+    <style>
+        .spin { animation: spin 1s linear infinite; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+    </style>
+</body>
+</html>

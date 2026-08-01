@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AttendanceIQ | Shifts</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+<script>if(!localStorage.getItem("token")){window.location.href="login.html";}</script>
+</head>
+<body>
+    <div class="layout-wrapper">
+        <aside class="sidebar">
+            <div class="logo-container">
+                <i class="ri-fingerprint-line logo-icon"></i>
+                <h2>AttendanceIQ</h2>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="index.html" class="nav-item"><i class="ri-dashboard-line"></i> <span>Tableau de bord</span></a>
+                <a href="employees.html" class="nav-item"><i class="ri-team-line"></i> <span>Employés</span></a>
+                <a href="absences.html" class="nav-item"><i class="ri-calendar-check-line"></i> <span>Absences</span></a>
+                <a href="reports.html" class="nav-item"><i class="ri-file-chart-line"></i> <span>Rapports</span></a>
+                <div class="nav-section-title" style="padding: 20px 24px 10px; color: #64748b; font-size: 12px; text-transform: uppercase; font-weight: bold;">Administration</div>
+                <a href="holidays.html" class="nav-item"><i class="ri-calendar-event-line"></i> <span>Jours Fériés</span></a>
+                <a href="leaves.html" class="nav-item"><i class="ri-calendar-todo-line"></i> <span>Congés</span></a>
+                <a href="shifts.html" class="nav-item active"><i class="ri-time-line"></i> <span>Horaires (Shifts)</span></a>
+                <a href="settings.html" class="nav-item"><i class="ri-settings-3-line"></i> <span>Configuration</span></a>
+            </nav>
+            <div style="padding:24px;margin-top:auto;"><button onclick="logout()" class="btn-secondary" style="width:100%;"><i class="ri-logout-box-line"></i> Déconnexion</button></div>
+        </aside>
+
+        <main class="main-content">
+            <header class="top-header">
+                <div class="header-title">
+                    <h1>Gestion des Shifts</h1>
+                    <p>Créez autant d'horaires personnalisés que nécessaire, puis assignez-les à vos employés (individuellement ou en masse) depuis la page Shifts.</p>
+                </div>
+                <div class="header-actions">
+                    <button class="btn-primary" onclick="openModal()">
+                        <i class="ri-add-line"></i> Créer un Shift
+                    </button>
+                </div>
+            </header>
+
+            <section class="data-section">
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Nom du Shift</th>
+                                <th>Heure Début</th>
+                                <th>Heure Fin</th>
+                                <th>Employés assignés</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="shifts-tbody">
+                            <tr><td colspan="5" style="text-align:center;">Chargement...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modal Nouveau Shift -->
+    <div id="modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center;">
+        <div style="background:white; padding:32px; border-radius:12px; width:400px;">
+            <h3>Nouveau Shift</h3><br>
+            <div class="form-group">
+                <label>Nom du Shift</label>
+                <input type="text" id="s-name" placeholder="ex: Équipe Matin, Gardien, Week-end, etc.">
+            </div>
+            <div class="grid-2">
+                <div class="form-group">
+                    <label>Heure Début</label>
+                    <input type="text" id="s-start" placeholder="08:00">
+                </div>
+                <div class="form-group">
+                    <label>Heure Fin</label>
+                    <input type="text" id="s-end" placeholder="16:00">
+                </div>
+            </div>
+            <div style="display:flex; gap:12px; justify-content:flex-end;">
+                <button class="btn-secondary" onclick="closeModal()">Annuler</button>
+                <button class="btn-primary" onclick="saveShift()">Enregistrer</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Assignation Employés -->
+    <div id="assignModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1001; align-items:center; justify-content:center;">
+        <div style="background:white; padding:32px; border-radius:12px; width:600px; max-height:80vh; display:flex; flex-direction:column;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <h3 id="assign-shift-name">Assigner au shift</h3>
+                <button onclick="closeAssignModal()" style="border:none; background:none; font-size:24px; cursor:pointer;">&times;</button>
+            </div>
+            <div style="margin-bottom:15px;">
+                <input type="text" id="emp-search" placeholder="Rechercher un employé..." style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;" oninput="filterAssignList()">
+            </div>
+            <div style="overflow-y:auto; flex-grow:1; border:1px solid #eee; border-radius:8px; margin-bottom:20px;">
+                <table class="data-table" style="width:100%;">
+                    <thead>
+                        <tr>
+                            <th style="width:40px;"><input type="checkbox" id="assign-select-all" onchange="toggleAssignAll(this)"></th>
+                            <th>Matricule</th>
+                            <th>Nom</th>
+                        </tr>
+                    </thead>
+                    <tbody id="assign-emp-tbody">
+                        <tr><td colspan="3" style="text-align:center;">Chargement...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div style="display:flex; gap:12px; justify-content:flex-end;">
+                <button class="btn-secondary" onclick="closeAssignModal()">Annuler</button>
+                <button class="btn-primary" onclick="saveAssignments()">Confirmer l'Assignation</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API = window.location.origin;
+        let selectedShiftId = null;
+        let allEmployeesForAssign = [];
+
+        function openModal() { document.getElementById('modal').style.display = 'flex'; }
+        function closeModal() { document.getElementById('modal').style.display = 'none'; }
+
+        function openAssignModal(shiftId, shiftName) {
+            selectedShiftId = shiftId;
+            document.getElementById('assign-shift-name').textContent = `Assigner au shift: ${shiftName}`;
+            document.getElementById('assignModal').style.display = 'flex';
+            loadEmployeesForAssign();
+        }
+
+        function closeAssignModal() {
+            document.getElementById('assignModal').style.display = 'none';
+            selectedShiftId = null;
+        }
+
+        async function loadEmployeesForAssign() {
+            const tbody = document.getElementById("assign-emp-tbody");
+            tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;">Chargement...</td></tr>';
+            try {
+                const res = await fetch(`${API}/employees/?status=all`);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                allEmployeesForAssign = await res.json();
+                renderAssignList(allEmployeesForAssign);
+            } catch (e) {
+                console.error("Erreur chargement employés:", e);
+                tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:red;">Erreur de chargement: ${e.message}</td></tr>`;
+            }
+        }
+
+        function renderAssignList(list) {
+            const tbody = document.getElementById("assign-emp-tbody");
+            if (list.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;">Aucun employé trouvé</td></tr>';
+                return;
+            }
+            tbody.innerHTML = list.map(e => `
+                <tr>
+                    <td><input type="checkbox" class="assign-emp-check" data-id="${e.id}"></td>
+                    <td>${e.matricule}</td>
+                    <td>${e.name}</td>
+                </tr>
+            `).join("");
+        }
+
+        function filterAssignList() {
+            const term = document.getElementById('emp-search').value.toLowerCase();
+            const filtered = allEmployeesForAssign.filter(e => 
+                e.name.toLowerCase().includes(term) || e.matricule.toLowerCase().includes(term)
+            );
+            renderAssignList(filtered);
+        }
+
+        function toggleAssignAll(checkbox) {
+            document.querySelectorAll(".assign-emp-check").forEach(cb => { cb.checked = checkbox.checked; });
+        }
+
+        async function saveAssignments() {
+            const selectedIds = Array.from(document.querySelectorAll(".assign-emp-check:checked"))
+                                    .map(cb => parseInt(cb.dataset.id));
+            if (selectedIds.length === 0) return alert("Veuillez sélectionner au moins un employé");
+
+            try {
+                const res = await fetch(`${API}/employees/bulk-assign-shift`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ employee_ids: selectedIds, shift_id: selectedShiftId })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    alert(`✅ ${data.updated || selectedIds.length} employé(s) assigné(s) avec succès`);
+                    closeAssignModal();
+                    loadShifts();
+                } else {
+                    const data = await res.json();
+                    alert(`❌ Erreur: ${data.detail || "Erreur inconnue"}`);
+                }
+            } catch (e) {
+                console.error(e);
+                alert("❌ Erreur de connexion au serveur");
+            }
+        }
+
+        async function loadShifts() {
+            try {
+                const shiftsRes = await fetch(`${API}/attendance/shifts/`);
+                if (!shiftsRes.ok) throw new Error(`HTTP ${shiftsRes.status}`);
+                const shifts = await shiftsRes.json();
+
+                const empRes = await fetch(`${API}/employees/?status=all`);
+                if (!empRes.ok) throw new Error(`HTTP ${empRes.status}`);
+                const employees = await empRes.json();
+
+                const countByShift = {};
+                employees.forEach(e => {
+                    if (e.shift_id) countByShift[e.shift_id] = (countByShift[e.shift_id] || 0) + 1;
+                });
+
+                const tbody = document.getElementById("shifts-tbody");
+                if (shifts.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Aucun shift configuré</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = shifts.map(s => `
+                    <tr>
+                        <td><strong>${s.name}</strong></td>
+                        <td>${s.start}</td>
+                        <td>${s.end}</td>
+                        <td>${countByShift[s.id] || 0}</td>
+                        <td>
+                            <div style="display:flex; gap:8px;">
+                                <button class="btn-secondary" style="color:var(--primary-color); border-color:var(--primary-color);" onclick="openAssignModal(${s.id}, '${s.name}')">
+                                    <i class="ri-user-add-line"></i> Assigner
+                                </button>
+                                <button class="btn-secondary" style="color:var(--danger); border-color:var(--danger);" onclick="deleteShift(${s.id})">
+                                    <i class="ri-delete-bin-line"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `).join("");
+            } catch (e) {
+                console.error("Erreur loadShifts:", e);
+                document.getElementById("shifts-tbody").innerHTML = `<tr><td colspan="5" style="text-align:center; color:red;">❌ Erreur de chargement: ${e.message}</td></tr>`;
+            }
+        }
+
+        async function saveShift() {
+            const name = document.getElementById('s-name').value;
+            const start_time = document.getElementById('s-start').value;
+            const end_time = document.getElementById('s-end').value;
+            if(!name || !start_time || !end_time) return alert("Veuillez remplir tous les champs");
+
+            try {
+                const res = await fetch(`${API}/attendance/shifts/?name=${encodeURIComponent(name)}&start_time=${encodeURIComponent(start_time)}&end_time=${encodeURIComponent(end_time)}`, {
+                    method: "POST"
+                });
+                if (res.ok) {
+                    document.getElementById('s-name').value = "";
+                    document.getElementById('s-start').value = "";
+                    document.getElementById('s-end').value = "";
+                    closeModal();
+                    loadShifts();
+                } else {
+                    const data = await res.json();
+                    alert(`❌ ${data.detail || "Erreur lors de l'enregistrement"}`);
+                }
+            } catch (e) {
+                alert("❌ Erreur de connexion au serveur");
+            }
+        }
+
+        async function deleteShift(id) {
+            if(!confirm("Supprimer ce shift ? Les employés qui y sont assignés seront désassignés.")) return;
+            try {
+                const res = await fetch(`${API}/attendance/shifts/${id}`, { method: "DELETE" });
+                if (res.ok) {
+                    loadShifts();
+                } else {
+                    const data = await res.json();
+                    alert(`❌ Erreur: ${data.detail || "Erreur inconnue"}`);
+                }
+            } catch (e) {
+                alert("❌ Erreur de connexion au serveur");
+            }
+        }
+
+        function logout(){ localStorage.clear(); window.location.href="login.html"; }
+        loadShifts();
+    </script>
+</body>
+</html>

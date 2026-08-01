@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AttendanceIQ | Jours Fériés</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+<script>if(!localStorage.getItem("token")){window.location.href="login.html";}</script>
+</head>
+<body>
+    <div class="layout-wrapper">
+        <aside class="sidebar">
+            <div class="logo-container">
+                <i class="ri-fingerprint-line logo-icon"></i>
+                <h2>AttendanceIQ</h2>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="index.html" class="nav-item"><i class="ri-dashboard-line"></i> <span>Tableau de bord</span></a>
+                <a href="employees.html" class="nav-item"><i class="ri-team-line"></i> <span>Employés</span></a>
+                <a href="absences.html" class="nav-item"><i class="ri-calendar-check-line"></i> <span>Absences</span></a>
+                <a href="reports.html" class="nav-item"><i class="ri-file-chart-line"></i> <span>Rapports</span></a>
+                <div class="nav-section-title" style="padding: 20px 24px 10px; color: #64748b; font-size: 12px; text-transform: uppercase; font-weight: bold;">Administration</div>
+                <a href="holidays.html" class="nav-item active"><i class="ri-calendar-event-line"></i> <span>Jours Fériés</span></a>
+                <a href="leaves.html" class="nav-item"><i class="ri-calendar-todo-line"></i> <span>Congés</span></a>
+                <a href="shifts.html" class="nav-item"><i class="ri-time-line"></i> <span>Horaires (Shifts)</span></a>
+                <a href="settings.html" class="nav-item"><i class="ri-settings-3-line"></i> <span>Configuration</span></a>
+            </nav>
+            <div style="padding:24px;margin-top:auto;"><button onclick="logout()" class="btn-secondary" style="width:100%;"><i class="ri-logout-box-line"></i> Déconnexion</button></div>
+        </aside>
+
+        <main class="main-content">
+            <header class="top-header">
+                <div class="header-title">
+                    <h1>Gestion des Jours Fériés</h1>
+                    <p>Définissez les jours non travaillés pour éviter les fausses absences</p>
+                </div>
+                <div class="header-actions">
+                    <div style="display:flex; gap:12px;">
+                        <button class="btn-secondary" onclick="seedAlgeria()" style="border-color:#16a34a; color:#16a34a;">
+                            <i class="ri-flag-line"></i> Importer fêtes nationales (Algérie)
+                        </button>
+                        <button class="btn-primary" onclick="openModal()">
+                            <i class="ri-add-line"></i> Ajouter un jour férié
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <div style="background:#f0fdf4; border:1px solid #bbf7d0; color:#166534; padding:12px 16px; border-radius:8px; margin-bottom:20px; font-size:14px;">
+                <i class="ri-information-line"></i>
+                Le bouton "Importer fêtes nationales" ajoute automatiquement les jours fériés civils fixes d'Algérie
+                (Nouvel An, Yennayer, Fête du Travail, Fête de l'Indépendance, Anniversaire de la Révolution) pour l'année en cours.
+                Les fêtes religieuses (Aïd el-Fitr, Aïd el-Adha, Ras El Am El Hijri, Mawlid Ennabaoui) suivent le calendrier lunaire
+                et changent chaque année : ajoutez-les manuellement ci-dessous dès que la date officielle est annoncée.
+            </div>
+
+            <section class="data-section">
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Nom du jour férié</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="holidays-tbody">
+                            <tr><td colspan="3" style="text-align:center;">Chargement...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Simple Modal -->
+    <div id="modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center;">
+        <div style="background:white; padding:32px; border-radius:12px; width:400px;">
+            <h3>Ajouter un jour férié</h3><br>
+            <div class="form-group">
+                <label>Date</label>
+                <input type="date" id="h-date">
+            </div>
+            <div class="form-group">
+                <label>Nom</label>
+                <input type="text" id="h-name" placeholder="ex: Aïd el-Fitr">
+            </div>
+            <div style="display:flex; gap:12px; justify-content:flex-end;">
+                <button class="btn-secondary" onclick="closeModal()">Annuler</button>
+                <button class="btn-primary" onclick="saveHoliday()">Enregistrer</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API = "http://127.0.0.1:8000";
+        function openModal() { document.getElementById('modal').style.display = 'flex'; }
+        function closeModal() { document.getElementById('modal').style.display = 'none'; }
+
+        async function loadHolidays() {
+            const res = await fetch(`${API}/attendance/holidays/`);
+            const holidays = await res.json();
+            const tbody = document.getElementById("holidays-tbody");
+            if (holidays.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;">Aucun jour férié configuré</td></tr>';
+                return;
+            }
+            tbody.innerHTML = holidays.map(h => `
+                <tr>
+                    <td>${h.date}</td>
+                    <td>${h.name}</td>
+                    <td><button class="btn-secondary" style="color:var(--danger); border-color:var(--danger);" onclick="deleteHoliday(${h.id})"><i class="ri-delete-bin-line"></i></button></td>
+                </tr>
+            `).join("");
+        }
+
+        async function saveHoliday() {
+            const date_str = document.getElementById('h-date').value;
+            const name = document.getElementById('h-name').value;
+            if(!date_str || !name) return alert("Veuillez remplir tous les champs");
+
+            const res = await fetch(`${API}/attendance/holidays/`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ date_str, name })
+            });
+            if (res.ok) {
+                closeModal();
+                document.getElementById('h-date').value = "";
+                document.getElementById('h-name').value = "";
+                loadHolidays();
+            } else {
+                const data = await res.json();
+                alert(`❌ ${data.detail || "Erreur lors de l'enregistrement"}`);
+            }
+        }
+
+        async function deleteHoliday(id) {
+            if(!confirm("Supprimer ce jour férié ?")) return;
+            await fetch(`${API}/attendance/holidays/${id}`, { method: "DELETE" });
+            loadHolidays();
+        }
+
+        async function seedAlgeria() {
+            try {
+                const res = await fetch(`${API}/attendance/holidays/seed-algeria`, { method: "POST" });
+                const data = await res.json();
+                if (res.ok) {
+                    alert(`✅ ${data.added} jour(s) férié(s) ajouté(s).\n\nℹ️ ${data.note}`);
+                    loadHolidays();
+                } else {
+                    alert("❌ Erreur lors de l'importation");
+                }
+            } catch (e) {
+                alert("❌ Erreur de connexion au serveur");
+            }
+        }
+
+        function logout(){ localStorage.clear(); window.location.href="login.html"; }
+        loadHolidays();
+    </script>
+</body>
+</html>
