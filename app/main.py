@@ -1,4 +1,6 @@
+import os
 import threading
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -6,6 +8,9 @@ from .database import engine, Base, SessionLocal
 from .routers import auth, employees, attendance, settings, sync
 from .models import User, Shift, Department
 from .services import hash_password, sync_from_mdb_internal
+
+# Charger les variables d'environnement (.env)
+load_dotenv()
 
 # Création des tables
 Base.metadata.create_all(bind=engine)
@@ -37,11 +42,15 @@ async def startup_event():
     def start_task():
         db = SessionLocal()
         try:
-            # Créer l'admin par défaut si inexistant
+            # Créer l'admin initial depuis .env si inexistant
             if not db.query(User).first():
-                admin = User(username="admin", password_hash=hash_password("admin123"), role="admin")
-                db.add(admin)
-                db.commit()
+                admin_password = os.getenv("ADMIN_PASSWORD")
+                if admin_password:
+                    admin = User(username=os.getenv("ADMIN_USERNAME", "admin"), password_hash=hash_password(admin_password), role="admin")
+                    db.add(admin)
+                    db.commit()
+                else:
+                    print("Aucun administrateur : définissez ADMIN_PASSWORD dans .env puis redémarrez.")
 
             # Créer les shifts par défaut
             if not db.query(Shift).first():

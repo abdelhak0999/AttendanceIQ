@@ -22,10 +22,9 @@ Professional time and attendance management system.
 6. Copy `.env.example` to `.env` and adjust.
 7. Run the server: `uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`
 
-## Default login
+## First login
 
-Username: `admin`
-Password: `admin123`
+Before the first start, set `ADMIN_PASSWORD` in `.env` (and optionally `ADMIN_USERNAME`, default `admin`). The admin account is created from these values when the database has no users yet.
 
 ## License
 

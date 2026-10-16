@@ -7,3 +7,4 @@ xlrd
 pyzk
 bcrypt
 python-multipart
+python-dotenv
